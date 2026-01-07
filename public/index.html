@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SaaS Shop Pro</title>
+    <title>RetailOS Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
@@ -119,22 +119,44 @@
                     <div class="text-3xl font-bold text-green-600" x-text="totalProfit + ' ₴'"></div>
                 </div>
             </div>
-            <div class="bg-white rounded-xl shadow p-6">
-                <table class="w-full">
-                    <thead class="bg-gray-50 rounded">
-                        <tr><th class="p-3 text-left">Дата</th><th class="p-3">К-сть чеків</th><th class="p-3">Виручка</th><th class="p-3">Прибуток</th></tr>
-                    </thead>
-                    <tbody>
-                        <template x-for="r in reports" :key="r.day">
-                            <tr class="border-b last:border-0">
-                                <td class="p-3" x-text="r.day"></td>
-                                <td class="p-3" x-text="r.count"></td>
-                                <td class="p-3 font-bold" x-text="r.revenue + ' ₴'"></td>
-                                <td class="p-3 text-green-600 font-bold" x-text="'+' + r.profit + ' ₴'"></td>
-                            </tr>
-                        </template>
-                    </tbody>
-                </table>
+
+            <div class="grid grid-cols-2 gap-6">
+                <div class="bg-white rounded-xl shadow p-6">
+                    <h3 class="font-bold mb-4 text-gray-400 uppercase text-xs tracking-widest">Статистика по днях</h3>
+                    <table class="w-full">
+                        <thead class="bg-gray-50">
+                            <tr><th class="p-3 text-left">Дата</th><th class="p-3">Чеки</th><th class="p-3 text-right">Виручка</th></tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="r in reports" :key="r.day">
+                                <tr class="border-b last:border-0">
+                                    <td class="p-3" x-text="r.day"></td>
+                                    <td class="p-3 text-center" x-text="r.count"></td>
+                                    <td class="p-3 text-right font-bold" x-text="r.revenue + ' ₴'"></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="bg-white rounded-xl shadow p-6">
+                    <h3 class="font-bold mb-4 text-gray-400 uppercase text-xs tracking-widest">Останні чеки (Дата, Час, Сума)</h3>
+                    <div class="overflow-y-auto max-h-[400px]">
+                        <table class="w-full">
+                            <thead class="bg-gray-50 sticky top-0">
+                                <tr><th class="p-3 text-left">Час продажу</th><th class="p-3 text-right">Сума</th></tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="sale in salesList" :key="sale.id">
+                                    <tr class="border-b hover:bg-gray-50">
+                                        <td class="p-3 text-sm text-gray-600" x-text="sale.created_at"></td>
+                                        <td class="p-3 text-right font-bold text-blue-600" x-text="sale.price_sell + ' ₴'"></td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
     </main>
@@ -164,7 +186,7 @@
                 currentTab: 'pos',
                 tabs: [ {id:'pos', label:'Каса', icon:'fa-solid fa-cash-register'}, {id:'stock', label:'Склад', icon:'fa-solid fa-boxes-stacked'}, {id:'reports', label:'Звіти', icon:'fa-solid fa-chart-line'} ],
                 loading: false, modalOpen: false,
-                inventory: [], reports: [], cart: [], search: '',
+                inventory: [], reports: [], salesList: [], cart: [], search: '',
                 newItem: { code: '', name: '', buy: null, sell: null, qty: 1 },
                 
                 get filteredInventory() {
@@ -183,6 +205,7 @@
                         const data = await res.json();
                         this.inventory = data.inventory;
                         this.reports = data.reports;
+                        this.salesList = data.salesList; // Завантажуємо історію чеків
                     } catch(e) { console.error(e); }
                     this.loading = false;
                 },

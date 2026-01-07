@@ -1,8 +1,7 @@
 export async function onRequest(context) {
   const { request, env } = context;
 
-  // 1. ІНІЦІАЛІЗАЦІЯ (Безпечна для Windows)
-  // Створюємо таблиці окремо, щоб уникнути помилки 'duration'
+  // 1. ІНІЦІАЛІЗАЦІЯ
   try {
     await env.DB.prepare(`
       CREATE TABLE IF NOT EXISTS inventory (
@@ -31,15 +30,14 @@ export async function onRequest(context) {
 
   // 2. ОБРОБКА ЗАПИТІВ
   try {
-    // GET: Завантаження даних
     if (request.method === "GET") {
       const inventory = await env.DB.prepare("SELECT * FROM inventory ORDER BY name").all();
       
-      // Складна аналітика SQL
+      // Агрегація по днях для графіків/таблиці статистики
       const reports = await env.DB.prepare(`
         SELECT 
           date(created_at) as day, 
-          COUNT(*) as count, 
+          COUNT(DISTINCT receipt_id) as count, 
           SUM(price_sell) as revenue, 
           SUM(price_sell - price_buy) as profit 
         FROM sales 
@@ -47,20 +45,29 @@ export async function onRequest(context) {
         ORDER BY day DESC LIMIT 7
       `).all();
 
+      // Список окремих продажів (Історія чеків)
+      // Ми групуємо по receipt_id, щоб один чек (кілька товарів) виглядав як одна строка в історії
+      const salesList = await env.DB.prepare(`
+        SELECT 
+          receipt_id as id,
+          created_at,
+          SUM(price_sell) as price_sell
+        FROM sales 
+        GROUP BY receipt_id
+        ORDER BY created_at DESC LIMIT 50
+      `).all();
+
       return Response.json({ 
         inventory: inventory.results || [], 
-        reports: reports.results || [] 
+        reports: reports.results || [],
+        salesList: salesList.results || []
       });
     }
 
-    // POST: Дії
     if (request.method === "POST") {
       const data = await request.json();
 
-      // --- ПРИЙОМ ТОВАРУ ---
       if (data.action === "receive") {
-        console.log(`[LOG] Прийом товару: ${data.name} (+${data.qty})`);
-        
         await env.DB.prepare(`
           INSERT INTO inventory (code, name, price_buy, price_sell, stock)
           VALUES (?1, ?2, ?3, ?4, ?5)
@@ -73,18 +80,15 @@ export async function onRequest(context) {
         return Response.json({ success: true });
       }
 
-      // --- ПРОДАЖ (ЧЕК) ---
       if (data.action === "checkout") {
-        console.log(`[LOG] Продаж чека: ${data.cart.length} позицій`);
         const receiptId = crypto.randomUUID().split('-')[0];
 
-        // Виконуємо цикл (найстабільніший метод для локальної розробки)
         for (const item of data.cart) {
-          // 1. Мінусуємо склад
+          // Зменшуємо залишок
           await env.DB.prepare("UPDATE inventory SET stock = stock - 1 WHERE code = ?")
             .bind(item.code).run();
           
-          // 2. Записуємо в історію
+          // Записуємо товар у чек
           await env.DB.prepare(`
             INSERT INTO sales (receipt_id, code, name, price_buy, price_sell) 
             VALUES (?, ?, ?, ?, ?)
