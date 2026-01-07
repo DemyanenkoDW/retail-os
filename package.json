@@ -1,0 +1,10 @@
+{
+  "name": "my-simple-saas",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "wrangler pages dev public --d1 DB --compatibility-date=2024-01-01"
+  },
+  "devDependencies": {
+    "wrangler": "latest"
+  }
+}

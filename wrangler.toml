@@ -1,0 +1,7 @@
+name = "my-simple-saas"
+pages_build_output_dir = "public"
+
+[[d1_databases]]
+binding = "DB" # Використовуйте "DB", щоб код у functions/api/hello.js спрацював
+database_name = "simple-db"
+database_id = "c394a56d-950a-42af-9fea-3a6dbdac18ba"

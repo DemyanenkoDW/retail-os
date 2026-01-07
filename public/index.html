@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SaaS Shop Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>[x-cloak] { display: none !important; }</style>
+</head>
+<body class="bg-gray-100 text-gray-800 h-screen flex overflow-hidden" x-data="app()">
+
+    <aside class="w-64 bg-slate-900 text-white flex flex-col shadow-2xl">
+        <div class="p-6 border-b border-slate-700">
+            <h1 class="text-2xl font-bold tracking-wider text-blue-400"><i class="fa-solid fa-layer-group mr-2"></i>RETAIL<span class="text-white">OS</span></h1>
+        </div>
+        <nav class="flex-1 p-4 space-y-2">
+            <template x-for="tab in tabs" :key="tab.id">
+                <button @click="currentTab = tab.id; fetchData()" 
+                    :class="currentTab === tab.id ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800 hover:text-white'"
+                    class="w-full text-left px-4 py-3 rounded-xl transition-all duration-200 flex items-center font-medium">
+                    <i :class="tab.icon" class="w-6 text-center mr-3"></i>
+                    <span x-text="tab.label"></span>
+                </button>
+            </template>
+        </nav>
+    </aside>
+
+    <main class="flex-1 overflow-auto p-8 relative">
+        <div x-show="loading" class="absolute top-4 right-4 bg-white px-4 py-2 rounded-full shadow flex items-center gap-2 text-sm font-bold text-blue-600 z-50">
+            <i class="fa-solid fa-circle-notch fa-spin"></i> Оновлення...
+        </div>
+
+        <div x-show="currentTab === 'pos'" x-transition.opacity>
+            <div class="flex gap-6 h-[calc(100vh-100px)]">
+                <div class="flex-1 flex flex-col gap-4">
+                    <input x-model="search" type="text" placeholder="🔍 Пошук за назвою або кодом..." class="w-full p-4 rounded-xl border-2 border-transparent focus:border-blue-500 shadow-sm outline-none">
+                    
+                    <div class="grid grid-cols-3 gap-4 overflow-y-auto pb-4 content-start">
+                        <template x-for="item in filteredInventory" :key="item.code">
+                            <div @click="addToCart(item)" class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 hover:border-blue-500 hover:shadow-md cursor-pointer transition active:scale-95">
+                                <div class="text-xs text-gray-400 mb-1" x-text="item.code"></div>
+                                <div class="font-bold text-gray-800 mb-2 truncate" x-text="item.name"></div>
+                                <div class="flex justify-between items-center">
+                                    <span class="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-md font-bold" x-text="item.stock + ' шт'"></span>
+                                    <span class="text-lg font-bold text-blue-600" x-text="item.price_sell + ' ₴'"></span>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <div class="w-96 bg-white rounded-2xl shadow-xl flex flex-col border border-gray-200">
+                    <div class="p-5 border-b bg-gray-50 rounded-t-2xl">
+                        <h2 class="font-bold text-xl text-gray-800"><i class="fa-solid fa-cart-shopping mr-2"></i>Поточний чек</h2>
+                    </div>
+                    <div class="flex-1 overflow-y-auto p-4 space-y-2">
+                        <template x-if="cart.length === 0">
+                            <div class="text-center text-gray-400 mt-10">Кошик порожній</div>
+                        </template>
+                        <template x-for="(item, idx) in cart" :key="idx">
+                            <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-100">
+                                <div>
+                                    <div class="text-sm font-bold" x-text="item.name"></div>
+                                    <div class="text-xs text-gray-500" x-text="item.price_sell + ' ₴'"></div>
+                                </div>
+                                <button @click="cart.splice(idx, 1)" class="text-red-400 hover:text-red-600 px-2"><i class="fa-solid fa-trash"></i></button>
+                            </div>
+                        </template>
+                    </div>
+                    <div class="p-5 border-t bg-gray-50 rounded-b-2xl">
+                        <div class="flex justify-between text-xl font-bold mb-4">
+                            <span>Разом:</span>
+                            <span x-text="cartTotal + ' ₴'"></span>
+                        </div>
+                        <button @click="checkout()" :disabled="cart.length === 0" class="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-xl font-bold shadow-lg transition">Оплатити</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div x-show="currentTab === 'stock'" x-transition.opacity x-cloak>
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold">Складський облік</h2>
+                <button @click="modalOpen = true" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-bold shadow flex items-center gap-2">
+                    <i class="fa-solid fa-plus"></i> Прийняти товар
+                </button>
+            </div>
+            <div class="bg-white rounded-xl shadow overflow-hidden">
+                <table class="w-full text-left">
+                    <thead class="bg-gray-50 text-gray-500 uppercase text-xs">
+                        <tr><th class="p-4">SKU</th><th class="p-4">Назва</th><th class="p-4">Закупівля</th><th class="p-4">Продаж</th><th class="p-4">Залишок</th></tr>
+                    </thead>
+                    <tbody class="divide-y">
+                        <template x-for="i in inventory" :key="i.code">
+                            <tr class="hover:bg-gray-50">
+                                <td class="p-4 font-mono text-gray-500" x-text="i.code"></td>
+                                <td class="p-4 font-bold" x-text="i.name"></td>
+                                <td class="p-4" x-text="i.price_buy"></td>
+                                <td class="p-4 text-blue-600 font-bold" x-text="i.price_sell"></td>
+                                <td class="p-4"><span class="px-3 py-1 rounded-full text-xs font-bold" :class="i.stock > 5 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'" x-text="i.stock"></span></td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div x-show="currentTab === 'reports'" x-transition.opacity x-cloak>
+            <h2 class="text-2xl font-bold mb-6">Фінансова звітність</h2>
+            <div class="grid grid-cols-3 gap-6 mb-8">
+                <div class="bg-white p-6 rounded-2xl shadow border-l-4 border-blue-500">
+                    <div class="text-gray-500">Виручка (7 днів)</div>
+                    <div class="text-3xl font-bold text-gray-800" x-text="totalRevenue + ' ₴'"></div>
+                </div>
+                <div class="bg-white p-6 rounded-2xl shadow border-l-4 border-green-500">
+                    <div class="text-gray-500">Чистий прибуток</div>
+                    <div class="text-3xl font-bold text-green-600" x-text="totalProfit + ' ₴'"></div>
+                </div>
+            </div>
+            <div class="bg-white rounded-xl shadow p-6">
+                <table class="w-full">
+                    <thead class="bg-gray-50 rounded">
+                        <tr><th class="p-3 text-left">Дата</th><th class="p-3">К-сть чеків</th><th class="p-3">Виручка</th><th class="p-3">Прибуток</th></tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="r in reports" :key="r.day">
+                            <tr class="border-b last:border-0">
+                                <td class="p-3" x-text="r.day"></td>
+                                <td class="p-3" x-text="r.count"></td>
+                                <td class="p-3 font-bold" x-text="r.revenue + ' ₴'"></td>
+                                <td class="p-3 text-green-600 font-bold" x-text="'+' + r.profit + ' ₴'"></td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <div x-show="modalOpen" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm" x-cloak>
+        <div class="bg-white p-8 rounded-2xl shadow-2xl w-96 transform transition-all" @click.away="modalOpen = false">
+            <h3 class="text-xl font-bold mb-4">📥 Прихід товару</h3>
+            <div class="space-y-3">
+                <input x-model="newItem.code" placeholder="Код (SKU)" class="w-full p-3 border rounded-lg outline-none focus:border-blue-500">
+                <input x-model="newItem.name" placeholder="Назва товару" class="w-full p-3 border rounded-lg outline-none focus:border-blue-500">
+                <div class="grid grid-cols-2 gap-2">
+                    <input x-model.number="newItem.buy" type="number" placeholder="Закуп" class="p-3 border rounded-lg">
+                    <input x-model.number="newItem.sell" type="number" placeholder="Продаж" class="p-3 border rounded-lg">
+                </div>
+                <input x-model.number="newItem.qty" type="number" placeholder="Кількість" class="w-full p-3 border rounded-lg">
+            </div>
+            <div class="mt-6 flex gap-3">
+                <button @click="modalOpen = false" class="flex-1 py-3 text-gray-500 font-bold bg-gray-100 rounded-xl">Скасувати</button>
+                <button @click="receiveGoods()" class="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl shadow-lg hover:bg-blue-700">Зберегти</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function app() {
+            return {
+                currentTab: 'pos',
+                tabs: [ {id:'pos', label:'Каса', icon:'fa-solid fa-cash-register'}, {id:'stock', label:'Склад', icon:'fa-solid fa-boxes-stacked'}, {id:'reports', label:'Звіти', icon:'fa-solid fa-chart-line'} ],
+                loading: false, modalOpen: false,
+                inventory: [], reports: [], cart: [], search: '',
+                newItem: { code: '', name: '', buy: null, sell: null, qty: 1 },
+                
+                get filteredInventory() {
+                    const s = this.search.toLowerCase();
+                    return this.inventory.filter(i => (i.name.toLowerCase().includes(s) || i.code.includes(s)) && i.stock > 0);
+                },
+                get cartTotal() { return this.cart.reduce((s, i) => s + i.price_sell, 0); },
+                get totalRevenue() { return this.reports.reduce((s, r) => s + r.revenue, 0); },
+                get totalProfit() { return this.reports.reduce((s, r) => s + r.profit, 0); },
+
+                async init() { this.fetchData(); },
+                async fetchData() {
+                    this.loading = true;
+                    try {
+                        const res = await fetch('/api/shop');
+                        const data = await res.json();
+                        this.inventory = data.inventory;
+                        this.reports = data.reports;
+                    } catch(e) { console.error(e); }
+                    this.loading = false;
+                },
+                addToCart(item) { this.cart.push({...item}); },
+                async receiveGoods() {
+                    this.loading = true;
+                    await fetch('/api/shop', { method:'POST', body:JSON.stringify({action:'receive', ...this.newItem}) });
+                    this.modalOpen = false; this.newItem = {code:'', name:'', buy:null, sell:null, qty:1};
+                    await this.fetchData();
+                    this.loading = false;
+                },
+                async checkout() {
+                    this.loading = true;
+                    await fetch('/api/shop', { method:'POST', body:JSON.stringify({action:'checkout', cart:this.cart}) });
+                    this.cart = []; await this.fetchData();
+                    this.loading = false;
+                    alert('✅ Успішно продано!');
+                }
+            }
+        }
+    </script>
+</body>
+</html>
