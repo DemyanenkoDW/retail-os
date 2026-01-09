@@ -1,7 +1,8 @@
 name = "my-simple-saas"
+compatibility_date = "2026-01-08"
 pages_build_output_dir = "public"
 
 [[d1_databases]]
-binding = "DB" # Використовуйте "DB", щоб код у functions/api/hello.js спрацював
-database_name = "simple-db"
-database_id = "c394a56d-950a-42af-9fea-3a6dbdac18ba"
+binding = "DB"
+database_name = "my-db"
+database_id = "your-id-here" # Для локальної розробки це значення може бути будь-яким
